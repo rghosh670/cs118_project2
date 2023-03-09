@@ -225,9 +225,6 @@ int main (int argc, char *argv[])
     static int packetMapSent[MAX_NUM_PKTS] = {0};
 
     while ((m = fread(buf, 1, PAYLOAD_SIZE, fp)) > 0){
-        cout << "here";
-        cout << buf << endl;
-        exit(0);
         mySeqNum += m;
         mySeqNum %= MAX_SEQN;
         buildPkt(&pkts[pktCounter], mySeqNum, 0, 0, 0, 1, 0, m, buf);
@@ -237,18 +234,29 @@ int main (int argc, char *argv[])
         pktCounter++;
     }
 
-    while (windowHi < packetMap.size()) {
+    windowHi = min(packetMap.size(), windowHi);
+
+    while (windowLo < packetMap.size() - 1) {
         n = recvfrom(sockfd, &ackpkt, PKT_SIZE, 0, (struct sockaddr *) &servaddr, (socklen_t *) &servaddrlen);
         int servAckNum = ackpkt.acknum;
 
         if (n > 0) {
-            for (size_t i = 0; i < insertOrder.size(); i++){
-                 if (servAckNum >= insertOrder[i]) {
+            if (servAckNum == insertOrder[0]){
+                printSend(&pkts[0], 0);
+                sendto(sockfd, &pkts[0], PKT_SIZE, 0, (struct sockaddr*) &servaddr, servaddrlen);
+                continue;
+            }
+
+
+            for (size_t i = windowLo; i < min(windowLo + MAX_SEQN, insertOrder.size()); i++){
+                if (servAckNum >= insertOrder[i]) {
                     packetMap[insertOrder[i]] = 1;
 
                     if (i >= windowLo) {
-                        windowLo = i;
+                        windowLo = (i == windowLo) ? i + 1 : i;
                         windowHi = windowLo + WND_SIZE - 1;
+                        windowHi = min(packetMap.size(), windowHi);
+                        break;
                     }
                 }
             }
@@ -264,13 +272,15 @@ int main (int argc, char *argv[])
         }
     }
 
-        // while (1) {
-        // n = recvfrom(sockfd, &ackpkt, PKT_SIZE, 0, (struct sockaddr *) &servaddr, (socklen_t *) &servaddrlen);
+    while (1) {
+        n = recvfrom(sockfd, &ackpkt, PKT_SIZE, 0, (struct sockaddr *) &servaddr, (socklen_t *) &servaddrlen);
 
-        // if (n > 0) {
-        //     printRecv(&ackpkt);
-        //     break;
-        // }
+        if (n > 0) {
+            printRecv(&ackpkt);
+            break;
+        }
+    }
+
 
     // *** End of your client implementation ***
     fclose(fp);

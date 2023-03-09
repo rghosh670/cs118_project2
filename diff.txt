@@ -1,0 +1,9 @@
+128454c128454,128457
+<         print i, c, ord(
+\ No newline at end of file
+---
+>         print i, c, ord(c), big[max(0, i-10):min(N, i+10)]
+>         s.add(c)
+>   print s
+>   print [ord(c) for c in s]
+\ No newline at end of file
