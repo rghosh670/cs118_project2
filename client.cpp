@@ -23,7 +23,7 @@ using namespace std;
 #define WND_SIZE 10 /* window size*/
 #define MAX_SEQN 25601 /* number of sequence numbers [0-25600] */
 #define FIN_WAIT 2 /* seconds to wait after receiving FIN*/
-#define MAX_NUM_PKTS 19532
+#define MAX_NUM_PKTS 30000
 
 // Packet Structure: Described in Section 2.1.1 of the spec. DO NOT CHANGE!
 struct packet {
@@ -224,17 +224,40 @@ int main (int argc, char *argv[])
     vector<int> insertOrder;
     static int packetMapSent[MAX_NUM_PKTS] = {0};
 
-    while ((m = fread(buf, 1, PAYLOAD_SIZE, fp)) > 0){
+    while (1) {
+        m = fread(buf, 1, PAYLOAD_SIZE, fp);
         mySeqNum += m;
         mySeqNum %= MAX_SEQN;
-        buildPkt(&pkts[pktCounter], mySeqNum, 0, 0, 0, 1, 0, m, buf);
+        buildPkt(&pkts[pktCounter], mySeqNum, 0, 0, 0, 0, 0, m, buf);
         packetMap[mySeqNum] = 0;
         insertOrder.push_back(mySeqNum);
         packetMapSent[pktCounter] = 0;
         pktCounter++;
+
+        if (feof(fp)){
+            break;
+        }
     }
 
+
+    // for (auto x: insertOrder){
+    //     cout << x << " x" << endl;
+    //     // cout << pkts[packetMap[x]].payload << endl;
+    // }
+
+    // exit(0);
+
     windowHi = min(packetMap.size(), windowHi);
+
+    while (packetMap.size() == 1){
+        n = recvfrom(sockfd, &ackpkt, PKT_SIZE, 0, (struct sockaddr *) &servaddr, (socklen_t *) &servaddrlen);
+        if (n > 0) {
+            printSend(&pkts[0], 0);
+            sendto(sockfd, &pkts[0], PKT_SIZE, 0, (struct sockaddr*) &servaddr, servaddrlen);
+            printRecv(&ackpkt);
+            break;
+        }
+    }
 
     while (windowLo < packetMap.size() - 1) {
         n = recvfrom(sockfd, &ackpkt, PKT_SIZE, 0, (struct sockaddr *) &servaddr, (socklen_t *) &servaddrlen);
