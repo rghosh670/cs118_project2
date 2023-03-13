@@ -224,32 +224,31 @@ int main (int argc, char *argv[])
     vector<int> insertOrder;
     static int packetMapSent[MAX_NUM_PKTS] = {0};
 
+    int previous_m = m;
     while (1) {
         m = fread(buf, 1, PAYLOAD_SIZE, fp);
-        mySeqNum += m;
+        if (m == 0)
+            break;
+        mySeqNum += previous_m;
+        previous_m = m;
         mySeqNum %= MAX_SEQN;
         buildPkt(&pkts[pktCounter], mySeqNum, 0, 0, 0, 0, 0, m, buf);
         packetMap[mySeqNum] = 0;
         insertOrder.push_back(mySeqNum);
         packetMapSent[pktCounter] = 0;
         pktCounter++;
-
-        if (feof(fp)){
-            break;
-        }
     }
 
-
-    // for (auto x: insertOrder){
-    //     cout << x << " x" << endl;
-    //     // cout << pkts[packetMap[x]].payload << endl;
+    // for (int i = 0; i < insertOrder.size(); i++){
+    //     cout << insertOrder[i] << endl;
     // }
 
     // exit(0);
 
-    windowHi = min(packetMap.size(), windowHi);
+    windowHi = min(insertOrder.size(), windowHi);
 
-    while (packetMap.size() == 1){
+    while (insertOrder.size() == 1){
+        // cout << "i am here " << endl;
         n = recvfrom(sockfd, &ackpkt, PKT_SIZE, 0, (struct sockaddr *) &servaddr, (socklen_t *) &servaddrlen);
         if (n > 0) {
             printSend(&pkts[0], 0);
@@ -259,14 +258,18 @@ int main (int argc, char *argv[])
         }
     }
 
-    while (windowLo < packetMap.size() - 1) {
+
+    while (windowLo < insertOrder.size() - 1) {
+        // cout << "am i here" << endl;
         n = recvfrom(sockfd, &ackpkt, PKT_SIZE, 0, (struct sockaddr *) &servaddr, (socklen_t *) &servaddrlen);
         int servAckNum = ackpkt.acknum;
 
         if (n > 0) {
+            
             if (servAckNum == insertOrder[0]){
                 printSend(&pkts[0], 0);
                 sendto(sockfd, &pkts[0], PKT_SIZE, 0, (struct sockaddr*) &servaddr, servaddrlen);
+                printRecv(&ackpkt);
                 continue;
             }
 
@@ -278,12 +281,13 @@ int main (int argc, char *argv[])
                     if (i >= windowLo) {
                         windowLo = (i == windowLo) ? i + 1 : i;
                         windowHi = windowLo + WND_SIZE - 1;
-                        windowHi = min(packetMap.size(), windowHi);
+                        windowHi = min(insertOrder.size(), windowHi);
                         break;
                     }
                 }
             }
 
+            printRecv(&ackpkt);
             for (size_t i = windowLo; i < windowHi; i ++){ 
                 if (packetMapSent[i] == 0) {
                     printSend(&pkts[i], 0);
@@ -291,7 +295,6 @@ int main (int argc, char *argv[])
                     packetMapSent[i] = 1;
                 }
             }
-            printRecv(&ackpkt);
         }
     }
 
