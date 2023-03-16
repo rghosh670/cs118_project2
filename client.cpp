@@ -270,7 +270,7 @@ int main (int argc, char *argv[])
     // for (auto x : insertOrder){
     //     cout << x << endl;
     // }
-    // cout << insertOrder[insertOrder.size() - 1] << endl;
+    // // cout << insertOrder[insertOrder.size() - 1] << endl;
 
     // exit(0);
 
@@ -337,6 +337,7 @@ int main (int argc, char *argv[])
 
         if (n > 0) {
             printRecv(&ackpkt);
+            // cout << "receieved here 69" << endl;
             size_t tempWindowLo = windowLo;
             for (size_t i = tempWindowLo; i < min(tempWindowLo + WND_SIZE, insertOrder.size()); i++){
                 // cout << "here " << servAckNum << " " << i << " " << windowLo << " " << insertOrder[i] << " " << min(windowLo + WND_SIZE, insertOrder.size()) << endl;
@@ -364,7 +365,7 @@ int main (int argc, char *argv[])
 
         } else {
             // cout << ackpkt.acknum << " " << pkts[0].seqnum << endl;
-            if (isTimeout(firstPktTimer) && ackpkt.acknum <= firstpkt.seqnum){
+            if (isTimeout(firstPktTimer) && ackpkt.acknum <= firstpkt.seqnum && windowLo < 5){
                 printTimeout(&firstpkt);
                 // cout << "timing out here 2" << endl;
                 // cout << "first pkt timeout" << endl;
@@ -373,7 +374,7 @@ int main (int argc, char *argv[])
                 firstPktTimer = setTimer();
                 // cout << "first pkt resent" << " " << firstpkt.seqnum << " " << firstpkt.acknum << endl;
             } 
-            if (isTimeout(onepktTimer) && ackpkt.acknum <= pkts[0].seqnum){
+            if (isTimeout(onepktTimer) && ackpkt.acknum <= pkts[0].seqnum && windowLo < 5){
                 printTimeout(&pkts[0]);
                 // cout << "timing out here 1" << endl;
                 // cout << "first pkt timeout" << endl;
@@ -398,23 +399,28 @@ int main (int argc, char *argv[])
         }
     }
 
-    // while (!onePacket){
-    //     time(&timer2);
-    //     if (difftime(timer2, timer1) > MAX_TIMEOUT)
-    //         exit(0);
-    //     n = recvfrom(sockfd, &ackpkt, PKT_SIZE, 0, (struct sockaddr *) &servaddr, (socklen_t *) &servaddrlen);
-    //     if(n > 0){
-    //         printRecv(&ackpkt);
-    //         if (ackpkt.acknum >= pkts[insertOrder[insertOrder.size() - 1]].seqnum + pkts[insertOrder[insertOrder.size() - 1]].length)
-    //             break;
-    //     }
-    //     else if (isTimeout(mainTimer)){
-    //         printTimeout(&pkts[insertOrder.size() - 1]);
-    //         printSend(&pkts[insertOrder[insertOrder.size() - 1]], 1);
-    //         sendto(sockfd, &pkts[insertOrder[insertOrder.size() - 1]], PKT_SIZE, 0, (struct sockaddr*) &servaddr, servaddrlen);
-    //         mainTimer = setTimer();
-    //     }
-    // }
+    while (!onePacket) {
+        // cout << "here " << ackpkt.acknum << "  " << (pkts[insertOrder.size() - 1].seqnum + pkts[insertOrder.size() - 1].length) <<endl;
+         if (ackpkt.acknum >= (pkts[insertOrder.size() - 1].seqnum + pkts[insertOrder.size() - 1].length))
+                break;
+        // time(&timer2);
+        // if (difftime(timer2, timer1) > MAX_TIMEOUT)
+        //     exit(0);
+
+        n = recvfrom(sockfd, &ackpkt, PKT_SIZE, 0, (struct sockaddr *) &servaddr, (socklen_t *) &servaddrlen);
+        if(n > 0){
+            printRecv(&ackpkt);
+            // cout << "here" << " " << (pkts[insertOrder.size() - 1].seqnum + pkts[insertOrder.size() - 1].length) << endl;
+            if (ackpkt.acknum >= (pkts[insertOrder.size() - 1].seqnum + pkts[insertOrder.size() - 1].length))
+                break;
+        }
+        else if (isTimeout(mainTimer)){
+            printTimeout(&pkts[insertOrder.size() - 1]);
+            printSend(&pkts[insertOrder.size() - 1], 1);
+            sendto(sockfd, &pkts[insertOrder.size() - 1], PKT_SIZE, 0, (struct sockaddr*) &servaddr, servaddrlen);
+            mainTimer = setTimer();
+        }
+    }
 
 
     // *** End of your client implementation ***
