@@ -9,7 +9,6 @@
 #include <fcntl.h>
 #include <iostream>
 #include <climits>
-#include <ctime>
 using namespace std;
 
 // =====================================
@@ -35,8 +34,6 @@ struct packet {
     char payload[PAYLOAD_SIZE];
 };
 
-time_t timer1;
-time_t timer2;
 
 // Printing Functions: Call them on receiving/sending/packet timeout according
 // Section 2.6 of the spec. The content is already conformant with the spec,
@@ -88,7 +85,6 @@ int isTimeout(double end) {
 
 int main (int argc, char *argv[])
 {
-    time(&timer1);
     if (argc != 3) {
         perror("ERROR: incorrect number of arguments\n"
                "Please use command \"./server <PORT> <ISN>\"\n");
@@ -155,23 +151,15 @@ int main (int argc, char *argv[])
         unsigned short cliSeqNum = (synpkt.seqnum + 1) % MAX_SEQN; // next message from client should have this sequence number
 
         buildPkt(&synackpkt, seqNum, cliSeqNum, 1, 0, 1, 0, 0, NULL);
-        bool wroteFirstPktToFile = false;
 
         while (1) {
-            time(&timer2);
-            if (difftime(timer2, timer1) > MAX_TIMEOUT)
-                exit(0);
             printSend(&synackpkt, 0);
             sendto(sockfd, &synackpkt, PKT_SIZE, 0, (struct sockaddr*) &cliaddr, cliaddrlen);
-            // cout << "sent synackpkt" << endl;
             while(1) {
                 n = recvfrom(sockfd, &ackpkt, PKT_SIZE, 0, (struct sockaddr *) &cliaddr, (socklen_t *) &cliaddrlen);
                 if (n > 0) {
-                    // cout << "handshake1" << endl;
                     printRecv(&ackpkt);
-                    // cout << "handshake2" << " " << ackpkt.seqnum << " " << cliSeqNum << " " << ackpkt.ack << " " <<  (synackpkt.seqnum + 1) % MAX_SEQN << endl;
                     if (ackpkt.seqnum == cliSeqNum && (ackpkt.ack || ackpkt.dupack) && ackpkt.acknum == (synackpkt.seqnum + 1) % MAX_SEQN) {
-                        // if (!wroteFirstPktToFile){
                             int length = snprintf(NULL, 0, "%d", i) + 6;
                             char* filename = (char*)malloc(length);
                             snprintf(filename, length, "%d.file", i);
@@ -184,15 +172,12 @@ int main (int argc, char *argv[])
                             }
 
                             fwrite(ackpkt.payload, 1, ackpkt.length, fp);
-                            wroteFirstPktToFile = true;
-                        // }
 
                         seqNum = ackpkt.acknum;
                         cliSeqNum = (ackpkt.seqnum + ackpkt.length) % MAX_SEQN;
 
                         buildPkt(&responsepkt, seqNum, (ackpkt.seqnum + ackpkt.length) % MAX_SEQN, 0, 0, 1, 0, 0, NULL);
                         printSend(&responsepkt, 0);
-                        // cout << "sent responsepkt" << endl;
                         sendto(sockfd, &responsepkt, PKT_SIZE, 0, (struct sockaddr*) &cliaddr, cliaddrlen);
 
                         break;
@@ -216,13 +201,9 @@ int main (int argc, char *argv[])
         //       without handling data loss.
         //       Only for demo purpose. DO NOT USE IT in your final submission
         struct packet recvpkt;
-        int prevACKNum = -1;
         bool isDupACK = 0;
 
         while(1) {
-            time(&timer2);
-            if (difftime(timer2, timer1) > MAX_TIMEOUT)
-                exit(0);
             n = recvfrom(sockfd, &recvpkt, PKT_SIZE, 0, (struct sockaddr *) &cliaddr, (socklen_t *) &cliaddrlen);
             if (n > 0) {
                 // cout << "here 1" << endl;
@@ -244,18 +225,11 @@ int main (int argc, char *argv[])
                     } else
                         isDupACK = true;
 
-                    // isDupACK = (cliSeqNum == prevACKNum);
-                    
-                    // prevACKNum = cliSeqNum;
-
-
                     if (!isDupACK)
                         fwrite(recvpkt.payload, 1, recvpkt.length, fp);
 
                     buildPkt(&ackpkt, seqNum, cliSeqNum, 0, 0, !isDupACK, isDupACK, 0, NULL);
-                    // cout << "sending here 1" << endl;
                     printSend(&ackpkt, 0);
-                    // cout << "sending here 2" << endl;
                     sendto(sockfd, &ackpkt, PKT_SIZE, 0, (struct sockaddr*) &cliaddr, cliaddrlen);
                 }
             } 
@@ -277,14 +251,7 @@ int main (int argc, char *argv[])
         double timer = setTimer();
 
         while (1) {
-            time(&timer2);
-            if (difftime(timer2, timer1) > MAX_TIMEOUT)
-                exit(0);
-
             while (1) {
-            time(&timer2);
-            if (difftime(timer2, timer1) > MAX_TIMEOUT)
-                exit(0);
                 n = recvfrom(sockfd, &lastackpkt, PKT_SIZE, 0, (struct sockaddr *) &cliaddr, (socklen_t *) &cliaddrlen);
                 if (n > 0)
                     break;
